@@ -1,0 +1,44 @@
+{
+  "manifestVersion": 1,
+  "id": "azure-devops-policy-guard",
+  "publisher": "ddbnl",
+  "version": "1.0.0",
+  "name": "Azure Devops Policy Guard",
+  "description": "Create, audit and guard security policies in Azure Devops.",
+  "public": false,
+  "categories": ["Azure Repos", "Azure Pipelines"],
+  "baseUri": "https://localhost:44300",
+  "targets": [
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
+  "contributions": [
+    {
+      "id": "policy-guard",
+      "type": "ms.vss-web.hub",
+      "targets": [
+        "ms.vss-code-web.code-hub-group"
+      ],
+      "properties": {
+        "name": "Policy Guard",
+        "uri": "policy-guard.html"
+      }
+    }
+  ],
+  "files": [
+    {
+      "path": "policy-guard.html",
+      "addressable": true
+    },
+    {
+      "path": "node_modules/azure-devops-extension-sdk",
+      "addressable": true,
+      "packagePath": "lib"
+    }
+  ],
+  "scopes": [
+    "vso.code",
+    "vso.security_manage"
+  ]
+}
