@@ -1,0 +1,75 @@
+{
+  "manifestVersion": 1,
+  "id": "azure-devops-policy-guard",
+  "publisher": "deBoerICT",
+  "version": "1.0.0.40",
+  "name": "Azure Devops Policy Guard",
+  "description": "Create, audit and guard security policies in Azure Devops.",
+  "public": false,
+  "categories": ["Azure Repos", "Azure Pipelines"],
+  "targets": [
+    {
+      "id": "Microsoft.VisualStudio.Services"
+    }
+  ],
+  "icons": {
+    "default": "icon.png"
+  },
+  "contributions": [
+    {
+      "id": "policy-guard-hub",
+      "type": "ms.vss-web.hub-group",
+      "description": "Create and guard policies.",
+      "targets": [
+        "ms.vss-web.project-hub-groups-collection"
+      ],
+      "properties": {
+        "name": "Policy Guard",
+        "order": 100,
+        "icon": "icon.png",
+        "iconAsset": "deBoerICT.azure-devops-policy-guard/icon.png",
+        "includesData": {
+          "assets": [
+            "deBoerICT.azure-devops-policy-guard/icon.png"
+          ]
+        }
+      }
+    },
+    {
+      "id": "policy-guard",
+      "type": "ms.vss-web.hub",
+      "targets": [
+          ".policy-guard-hub"
+      ],
+      "properties": {
+        "name": "Policy Guard",
+        "uri": "policy-guard.html",
+        "iconAsset": "deBoerICT.azure-devops-policy-guard/icon.png",
+        "includesData": {
+          "assets": [
+            "deBoerICT.azure-devops-policy-guard/icon.png"
+          ]
+        }
+      }
+    }
+  ],
+  "files": [
+    {
+      "path": "policy-guard.html",
+      "addressable": true
+    },
+    {
+      "path": "icon.png",
+      "addressable": true
+    },
+    {
+      "path": "node_modules/azure-devops-extension-sdk",
+      "addressable": true,
+      "packagePath": "lib"
+    }
+  ],
+  "scopes": [
+    "vso.code",
+    "vso.security_manage"
+  ]
+}

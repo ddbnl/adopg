@@ -1,4 +1,11 @@
-publish.sh
+npm-debug.log
 node_modules/
+dist/
 *.vsix
-package-lock.json
+
+# JUNIT testresult
+test-results.xml
+
+# Coverage directory used by tools like istanbul
+coverage
+*.lcov
