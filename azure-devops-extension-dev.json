@@ -30,6 +30,5 @@
             "path": "dist",
             "addressable": true
         }
-    ],
-    "baseUri": "https://localhost:3000"
+    ]
 }

@@ -16,7 +16,8 @@ fs.readdirSync(samplesDir).filter(dir => {
 module.exports = (env, argv) => ({
     entry: entries,
     output: {
-        filename: "[name]/[name].js"
+        filename: "[name]/[name].js",
+        publicPath: "/dist/"
     },
     resolve: {
         extensions: [".ts", ".tsx", ".js"],
@@ -62,8 +63,9 @@ module.exports = (env, argv) => ({
         ? {
               devtool: 'inline-source-map',
               devServer: {
+                  liveReload: true,
                   server: 'https',
-                  port: 3000
+                  port: 3000,
               }
           }
         : {})
