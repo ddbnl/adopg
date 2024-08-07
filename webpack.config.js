@@ -14,10 +14,9 @@ fs.readdirSync(samplesDir).filter(dir => {
 });
 
 module.exports = (env, argv) => ({
-    entry: entries,
+    entry: "./src/Common.tsx",
     output: {
-        filename: "[name]/[name].js",
-        publicPath: "/dist/"
+        filename: "code-hub-group/[name].js",
     },
     resolve: {
         extensions: [".ts", ".tsx", ".js"],

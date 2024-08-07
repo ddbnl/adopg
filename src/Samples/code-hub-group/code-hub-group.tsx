@@ -6,183 +6,155 @@ import "./code-hub-group.scss";
 import {Header} from "azure-devops-ui/Header";
 import { Page } from "azure-devops-ui/Page";
 
-import { showRootComponent } from "../../Common";
 import { CommonServiceIds, IProjectPageService } from "azure-devops-extension-api";
 import {GitServiceIds, IVersionControlRepositoryService} from "azure-devops-extension-api/Git/GitServices";
 import {IHeaderCommandBarItem} from "azure-devops-ui/HeaderCommandBar";
-import {ITreeColumn, renderTreeCell, Tree} from "azure-devops-ui/TreeEx";
-import {ArrayItemProvider, IItemProvider} from "azure-devops-ui/Utilities/Provider";
-import {TreeItemProvider} from "azure-devops-ui/Utilities/TreeItemProvider";
-import {
-    ColumnFill, ISimpleTableCell,
-    ITableColumn,
-    renderEmptyCell,
-    renderSimpleCell,
-    Table,
-    TableColumnLayout
-} from "azure-devops-ui/Table";
-import {ItemsObserver} from "azure-devops-ui/Observer";
-import {ObservableValue} from "azure-devops-ui/Core/Observable";
+import PolicyTree from "./policy-tree";
+import {useEffect} from "react";
 
-interface ICodeHubGroup { 
-    projectName: string;
-    repoName: string;
-    orgName: string;
+
+const CodeHubGroup = () => {
     
-}
+    const [policies, setPolicies] = React.useState<Pipeline[]>([]);
+    useEffect(() => {
+        const inner = async () => {
 
-class CodeHubGroup extends React.Component<{}, ICodeHubGroup> {
+            try {
+                console.log("Component did mount, initializing SDK...");
+                SDK.init().catch(console.error)
 
-    constructor(props: {}) {
-        super(props);
-        this.state = {projectName: "Loading..", repoName: "Loading..", orgName: "Loading.."};
-    }
-
-    public componentDidMount() {
-        try {
-            console.log("Component did mount, initializing SDK...");
-            SDK.init().catch(console.error)
-
-            SDK.ready().then(async () => {
-                console.log("SDK is ready, loading project context...");
-                await this.loadProjectContext();
-            }).catch((error) => {
-                console.error("SDK ready failed: ", error);
-            });
-        } catch (error) {
-            console.error("Error during SDK initialization or project context loading: ", error);
-        }
-    }
-
-    public render(): JSX.Element {
-        return (
-            <Page className="sample-hub flex-grow">
-                <Header title="Policy guard" commandBarItems={this.getCommandBarItems()}/>
-                <div className="page-content">
-                    <Table columns={tableDefinition} itemProvider={getItems()} role={"table"}/>
-                </div>
-            </Page>
-        );
-    }
-
-    private async loadProjectContext(): Promise<void> {
-        try {
-            const client = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
-            const context = await client.getProject();
-            const repoClient = await SDK.getService<IVersionControlRepositoryService>(GitServiceIds.VersionControlRepositoryService);
-            const repo = await repoClient.getCurrentGitRepository();
-            const organization = SDK.getHost();
-
-            this.setState({
-                projectName: (context != null) ? context.name : "Loading..",
-                repoName: (repo != null) ? repo.name : "Loading..",
-                orgName: organization.name,
-            });
-            SDK.notifyLoadSucceeded();
-        } catch (error) {
-            console.error("Failed to load project context: ", error);
-        }
-    }
-
-    private getCommandBarItems(): IHeaderCommandBarItem[] {
-        return [
-            {
-                id: "refresh",
-                text: "Refresh",
-                isPrimary: true,
-                iconProps: {
-                    iconName: "Refresh",
-                },
-                onActivate: () => {
-                    const refreshFunc = async () => {
-                        await this.onRefreshClicked();
-                    }
-                    refreshFunc()
-                        .catch(console.error);
-                },
-            },
-        ];
-    }
-
-    private async onRefreshClicked(): Promise<void> {
-
-        await this.connectBackend();
-        await this.RefreshBackend();
-    }
-
-    private async connectBackend(): Promise<void> {
-        const requestOptions = {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-        }
-        await fetch(`http://localhost:5214/connect?organization=${this.state.orgName}`, requestOptions)
-    }
-
-    private async RefreshBackend(): Promise<void> {
-        const requestOptions = {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-        }
-        await fetch('http://localhost:5214/refresh', requestOptions)
-    }
-}
-
-
-const tableDefinition = [
-    {
-        columnLayout: TableColumnLayout.singleLinePrefix,
-        id: 'name',
-        name: 'Status',
-        readonly: true,
-        renderCell: renderSimpleCell,
-        width: new ObservableValue(200),
-    },
-    {
-        id: 'policy',
-        name: 'Policy',
-        readonly: true,
-        renderCell: renderSimpleCell,
-        width: new ObservableValue(600),
-    },
-    {
-        id: 'actions',
-        name: 'Actions',
-        readonly: true,
-        renderCell: renderSimpleCell,
-        width: new ObservableValue(600),
-    },
-    ColumnFill,
-];
-
-interface FieldTableItem extends ISimpleTableCell {
-    name: string;
-    policy: string;
-    actions: string;
-}
-
-interface FieldsTableProps {
-    itemProvider: IItemProvider<FieldTableItem>;
-}
-
-function getItems(): IItemProvider<FieldTableItem> {
-    return new ArrayItemProvider<FieldTableItem>([
-            {
-                name: "een",
-                policy: "een",
-                actions: "een",
-            },
-            {
-                name: "twee",
-                policy: "twee",
-                actions: "twee",
-            },
-            {
-                name: "drie",
-                policy: "drie",
-                actions: "drie",
+                SDK.ready().then(async () => {
+                    console.log("SDK is ready, loading project context...");
+                    const client = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
+                    const repoClient = await SDK
+                        .getService<IVersionControlRepositoryService>(GitServiceIds.VersionControlRepositoryService);
+                    const organization = SDK.getHost();
+                    const policies = await client.getProject().then(async context => {
+                        return repoClient.getCurrentGitRepository().then(async repo => {
+                            return connectBackend(organization.name).then(async () => {
+                                return RefreshBackend().then(async () => {
+                                    return await GetPolicies(context.name, repo.name);
+                                });
+                            });
+                        });
+                    })
+                    setPolicies(policies);
+                }).catch((error) => {
+                    console.error("SDK ready failed: ", error);
+                });
+            } catch (error) {
+                console.error("Error during SDK initialization or project context loading: ", error);
             }
-        ])
-}
-    
+            await SDK.notifyLoadSucceeded();
+        }
+        inner()
+            .catch(console.error);
 
-showRootComponent(<CodeHubGroup />);
+    }, [])
+
+    return (
+        <Page className="sample-hub flex-grow">
+            <Header title="Policy guard" commandBarItems={getCommandBarItems()}/>
+            <div className="page-content">
+                <PolicyTree policies={policies}/>
+            </div>
+        </Page>
+    );
+}
+
+function getCommandBarItems(): IHeaderCommandBarItem[] {
+    return [
+        {
+            id: "refresh",
+            text: "Refresh",
+            isPrimary: true,
+            iconProps: {
+                iconName: "Refresh",
+            },
+            onActivate: () => {
+                const refreshFunc = async () => {
+                    await onRefreshClicked();
+                }
+                refreshFunc()
+                    .catch(console.error);
+            },
+        },
+    ];
+}
+
+async function onRefreshClicked(): Promise<void> {
+
+    const organization = SDK.getHost();
+    await connectBackend(organization.name);
+    await RefreshBackend();
+}
+
+async function connectBackend(organization: string): Promise<void> {
+    const requestOptions = {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+    }
+    await fetch(`http://localhost:5214/connect?organization=${organization}`, requestOptions)
+}
+
+async function RefreshBackend(): Promise<void> {
+    const requestOptions = {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+    }
+    await fetch('http://localhost:5214/refresh', requestOptions)
+}
+
+async function GetPolicies(project: string, repo: string) : Promise<Pipeline[]> {
+    const requestOptions = {
+        method: 'GET',
+        headers: {'Content-Type': 'application/json'},
+    }
+    const url =`http://localhost:5214/projects/${project}/policies`;
+    console.log("AAAAAAAAAAAAADSFF")
+    const response = await fetch(url, requestOptions);
+    const json: object = await response.json();
+    console.log(json);
+    
+    let pipelines: Pipeline[] = [];
+
+    
+    for (const [pipelineName, pipelineData] of Object.entries(json)) {
+        console.log("1")
+        
+        let policies: Policy[] = [];
+        for (const policyJson of pipelineData) {
+            console.log("2")
+            policies.push({
+                Description: policyJson['description'],
+                Compliant: policyJson['compliant'],
+                LastChecked: policyJson['lastChecked'],
+                Errors: policyJson['errors'],
+            });
+            console.log("3")
+        }
+        console.log("4")
+        const pipeline: Pipeline = {
+            Name: pipelineName,
+            Policies: policies,
+        }
+        console.log("5")
+        pipelines.push(pipeline);
+    }
+    console.log("6")
+    return pipelines;
+}
+
+export default CodeHubGroup
+
+export interface Pipeline {
+    Name: string;
+    Policies: Policy[];
+}
+
+export interface Policy {
+    Description: string;
+    Compliant: boolean;
+    LastChecked: string;
+    Errors: [string];
+}
