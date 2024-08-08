@@ -1,0 +1,46 @@
+{
+    "contributions": [
+        {
+            "id": "policy-guard-hub",
+            "type": "ms.vss-web.hub-group",
+            "description": "Create and guard policies.",
+            "targets": [
+                "ms.vss-web.project-hub-groups-collection"
+            ],
+            "properties": {
+                "name": "Policy Guard",
+                "order": 100,
+                "icon": "icon.png",
+                "iconAsset": "deBoerICT.azure-devops-policy-guard/icon.png",
+                "includesData": {
+                    "assets": [
+                        "deBoerICT.azure-devops-policy-guard/icon.png"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "policy-guard-hub-group",
+            "type": "ms.vss-web.hub",
+            "targets": [
+                ".policy-guard-hub"
+            ],
+            "properties": {
+                "name": "Policy Guard",
+                "uri": "policy-guard/policy-guard.html",
+                "iconAsset": "deBoerICT.azure-devops-policy-guard/icon.png",
+                "includesData": {
+                    "assets": [
+                        "deBoerICT.azure-devops-policy-guard/icon.png"
+                    ]
+                }
+            }
+        }
+    ],
+    "files": [
+        {
+            "path": "icon.png",
+            "addressable": true
+        }
+    ]
+}

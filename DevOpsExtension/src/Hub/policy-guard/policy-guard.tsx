@@ -1,43 +1,38 @@
 import * as React from "react";
 import * as SDK from "azure-devops-extension-sdk";
 
-import "./code-hub-group.scss";
+import "./policy-guard.scss";
 
 import {Header} from "azure-devops-ui/Header";
 import { Page } from "azure-devops-ui/Page";
 
 import { CommonServiceIds, IProjectPageService } from "azure-devops-extension-api";
-import {GitServiceIds, IVersionControlRepositoryService} from "azure-devops-extension-api/Git/GitServices";
 import {IHeaderCommandBarItem} from "azure-devops-ui/HeaderCommandBar";
 import PolicyTree from "./policy-tree";
 import {useEffect} from "react";
 
 
-const CodeHubGroup = () => {
+const PolicyGuard = () => {
     
     const [policies, setPolicies] = React.useState<Pipeline[]>([]);
     useEffect(() => {
         const inner = async () => {
 
             try {
-                console.log("Component did mount, initializing SDK...");
+                console.log("Initializing SDK...");
                 SDK.init().catch(console.error)
 
                 SDK.ready().then(async () => {
-                    console.log("SDK is ready, loading project context...");
+                    console.log("SDK is ready...");
                     const client = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
-                    const repoClient = await SDK
-                        .getService<IVersionControlRepositoryService>(GitServiceIds.VersionControlRepositoryService);
                     const organization = SDK.getHost();
                     const policies = await client.getProject().then(async context => {
-                        return repoClient.getCurrentGitRepository().then(async repo => {
-                            return connectBackend(organization.name).then(async () => {
-                                return RefreshBackend().then(async () => {
-                                    return await GetPolicies(context.name, repo.name);
-                                });
+                        return connectBackend(organization.name).then(async () => {
+                            return RefreshBackend().then(async () => {
+                                return await GetPolicies(context.name);
                             });
                         });
-                    })
+                    });
                     setPolicies(policies);
                 }).catch((error) => {
                     console.error("SDK ready failed: ", error);
@@ -105,47 +100,51 @@ async function RefreshBackend(): Promise<void> {
     await fetch('http://localhost:5214/refresh', requestOptions)
 }
 
-async function GetPolicies(project: string, repo: string) : Promise<Pipeline[]> {
+export async function remediatePolicy(project: string,  policyId: string,  userDescriptor: string): Promise<void> {
+    const body = {
+        descriptor: userDescriptor,
+    }
+    const requestOptions = {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+    }
+    await fetch(`http://localhost:5214/projects/${project}/policies/${policyId}/remediate`, requestOptions)
+}
+async function GetPolicies(project: string) : Promise<Pipeline[]> {
     const requestOptions = {
         method: 'GET',
         headers: {'Content-Type': 'application/json'},
     }
     const url =`http://localhost:5214/projects/${project}/policies`;
-    console.log("AAAAAAAAAAAAADSFF")
     const response = await fetch(url, requestOptions);
     const json: object = await response.json();
-    console.log(json);
     
     let pipelines: Pipeline[] = [];
 
     
     for (const [pipelineName, pipelineData] of Object.entries(json)) {
-        console.log("1")
         
         let policies: Policy[] = [];
         for (const policyJson of pipelineData) {
-            console.log("2")
             policies.push({
+                Id: policyJson['id'],
                 Description: policyJson['description'],
                 Compliant: policyJson['compliant'],
                 LastChecked: policyJson['lastChecked'],
                 Errors: policyJson['errors'],
             });
-            console.log("3")
         }
-        console.log("4")
         const pipeline: Pipeline = {
             Name: pipelineName,
             Policies: policies,
         }
-        console.log("5")
         pipelines.push(pipeline);
     }
-    console.log("6")
     return pipelines;
 }
 
-export default CodeHubGroup
+export default PolicyGuard
 
 export interface Pipeline {
     Name: string;
@@ -153,6 +152,7 @@ export interface Pipeline {
 }
 
 export interface Policy {
+    Id: string;
     Description: string;
     Compliant: boolean;
     LastChecked: string;

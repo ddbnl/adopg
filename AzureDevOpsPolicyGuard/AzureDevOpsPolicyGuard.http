@@ -1,0 +1,6 @@
+@AzureDevOpsPolicyGuard_HostAddress = http://localhost:5214
+
+GET {{AzureDevOpsPolicyGuard_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
