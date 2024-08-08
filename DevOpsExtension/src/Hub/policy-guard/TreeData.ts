@@ -3,9 +3,10 @@ import {ColumnMore, ISimpleTableCell} from "azure-devops-ui/Table";
 import {renderExpandableTreeCell, renderTreeCell} from "azure-devops-ui/TreeEx";
 import {ITreeItem, ITreeItemProvider, TreeItemProvider,} from "azure-devops-ui/Utilities/TreeItemProvider";
 import {IconSize} from "azure-devops-ui/Icon";
-import {Pipeline, Policy} from "./code-hub-group";
-import {Simulate} from "react-dom/test-utils";
-import error = Simulate.error;
+import {Pipeline, remediatePolicy} from "./policy-guard";
+import {IMenuItem} from "azure-devops-ui/Menu";
+import * as SDK from "azure-devops-extension-sdk";
+import {CommonServiceIds, IProjectPageService} from "azure-devops-extension-api";
 
 export interface IPolicyTableItem extends ISimpleTableCell {
     policy: string;
@@ -30,17 +31,35 @@ export const statusColumn = {
     renderCell: renderTreeCell,
     width: 100,
 };
-export const moreColumn = new ColumnMore(() => {
+
+export const moreColumn = new ColumnMore(target => {
     return {
         id: "sub-menu",
         items: [
-            { id: "submenu-one", text: "Reconcile" },
-            { id: "submenu-two", text: "Exempt" },
+            { 
+                id: "reconcile",
+                text: "Reconcile",
+                
+                onActivate: (menuItem: any, event: any) => {
+                    OnReconcile(target)
+                        .catch(console.error)
+                },
+            },
+            { id: "exempt", text: "Exempt" },
         ],
     };
 });
 
 export const treeColumns = [pipelineColumn, statusColumn, policyColumn, moreColumn];
+
+async function OnReconcile(menuItem: any): Promise<void> {
+    const policyId = menuItem.underlyingItem.data.reconcile;
+    const client = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
+    const project = await client.getProject();
+    const user = SDK.getUser();
+    console.log("onReconcile", user);
+    await remediatePolicy(project.name, policyId, user.id)
+}
 
 export function getItemProvider(pipelines: Pipeline[]): ITreeItemProvider<IPolicyTableItem> {
 
@@ -58,6 +77,7 @@ export function getItemProvider(pipelines: Pipeline[]): ITreeItemProvider<IPolic
                             pipeline: "",
                             policy: error,
                             status: GetErrorStatus(),
+                            reconcile: policy.Id,
                         }
                     }
                 )
