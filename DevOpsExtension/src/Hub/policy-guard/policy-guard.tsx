@@ -100,9 +100,10 @@ async function RefreshBackend(): Promise<void> {
     await fetch('http://localhost:5214/refresh', requestOptions)
 }
 
-export async function remediatePolicy(project: string,  policyId: string,  userDescriptor: string): Promise<void> {
+export async function remediatePolicy(project: string,  policyId: string, reconcileError: number, userDescriptor: string): Promise<void> {
     const body = {
         descriptor: userDescriptor,
+        reconcile_error: reconcileError,
     }
     const requestOptions = {
         method: 'POST',

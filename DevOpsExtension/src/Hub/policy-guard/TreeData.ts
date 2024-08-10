@@ -54,11 +54,12 @@ export const treeColumns = [pipelineColumn, statusColumn, policyColumn, moreColu
 
 async function OnReconcile(menuItem: any): Promise<void> {
     const policyId = menuItem.underlyingItem.data.reconcile;
+    const reconcileError = menuItem.underlyingItem.data.reconcile_error;
     const client = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
     const project = await client.getProject();
     const user = SDK.getUser();
     console.log("onReconcile", user);
-    await remediatePolicy(project.name, policyId, user.id)
+    await remediatePolicy(project.name, policyId, reconcileError, user.id)
 }
 
 export function getItemProvider(pipelines: Pipeline[]): ITreeItemProvider<IPolicyTableItem> {
@@ -69,6 +70,7 @@ export function getItemProvider(pipelines: Pipeline[]): ITreeItemProvider<IPolic
         let pipelineCompliant = true;
         for (const policy of pipeline.Policies) {
             let errorChildren: any = [];
+            let i = 0;
             policy.Errors.forEach(error => {
                 pipelineCompliant = false;
                 errorChildren.push(
@@ -78,10 +80,11 @@ export function getItemProvider(pipelines: Pipeline[]): ITreeItemProvider<IPolic
                             policy: error,
                             status: GetErrorStatus(),
                             reconcile: policy.Id,
+                            reconcile_error: i,
                         }
                     }
                 )
-                return errorChildren
+                i += 1;
             })
 
             let policyChildren: any = [];
