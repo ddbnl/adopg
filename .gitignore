@@ -18,3 +18,4 @@ DevopsExtension/test-results.xml
 # Coverage directory used by tools like istanbul
 DevopsExtension/coverage
 *.lcov
+*.vsix

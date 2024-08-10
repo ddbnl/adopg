@@ -72,14 +72,14 @@ public class PolicyController : ControllerBase
     
     [HttpPost]
     [Route("/projects/{project}/policies/{policyId}/remediate")]
-    public IActionResult RemediatePolicy(string project, Guid policyId, UserDto user)
+    public async Task<IActionResult> RemediatePolicy(string project, Guid policyId, int reconcileError, UserDto user)
     {
         if (!IsProjectAdmin.Evaluate(project, "Project Administrators", user.Descriptor))
         {
             return Unauthorized("You are not a project administrator.");
         }
         var policy = RepoNoDeleteRepository.GetById(policyId);
-        policy.Remediate();
+        await policy.Remediate(reconcileError);
         return Ok("Remediation started.");
     }
 }

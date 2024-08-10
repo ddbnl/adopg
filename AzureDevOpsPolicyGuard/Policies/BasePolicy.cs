@@ -6,21 +6,21 @@ namespace AzureDevOpsPolicyGuard.Policies;
 public abstract class BasePolicy
 {
     public readonly Guid Id;
-    public readonly string Project;
+    public readonly ProjectCache Project;
     public readonly int PipelineId;
     protected bool IsCompliant;
     protected bool IsChecked;
     protected DateTimeOffset LastChecked;
     protected List<string> ComplianceFailures = [];
 
-    public BasePolicy(string project, int pipelineId)
+    public BasePolicy(ProjectCache project, int pipelineId)
     {
         Id = Guid.NewGuid();
         Project = project;
         PipelineId = pipelineId;
     }
 
-    public abstract Task Remediate();
+    public abstract Task Remediate(int compliancyError);
 
     public bool GetCompliant()
     {

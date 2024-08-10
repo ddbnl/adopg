@@ -188,30 +188,53 @@ public static class AzureDevops
         return identity;
     }
     
-    public static async Task<Dictionary<Identity, RepoAcl>> GetRepoAclByName(string name, string project)
+    public static async Task<Dictionary<Identity, RepoAcl>> GetRepoAcl(string token)
     {
+
+
+        var result = new Dictionary<Identity, RepoAcl>();
+    
         var connection = GetConnection();
         var client = connection.GetClient<SecurityHttpClient>();
         var gitRepoNamespace = await GetSecurityNamespaceByName("Git Repositories");
-        var repo = await GetRepoByName(name, project);
         var acls = await client.QueryAccessControlListsAsync(
             securityNamespaceId: gitRepoNamespace.NamespaceId,
-            token: $"repoV2/{repo.Id}",
+            token: token,
             descriptors: [],
             includeExtendedInfo: true,
             recurse: false
             );
 
-        var result = new Dictionary<Identity, RepoAcl>();
         foreach (var acl in acls)
         {
             foreach (var sid in acl.AcesDictionary.Keys)
             {
-                var permissions = (RepoAcl)acl.AcesDictionary[sid].ExtendedInfo.EffectiveAllow;
+                var permissions = (RepoAcl)acl.AcesDictionary[sid].Allow;
                 var identity = await FindIdentityById(sid.Identifier);
-                result.Add(identity, permissions);
+                if (!result.ContainsKey(identity))
+                {
+                    result.Add(identity, permissions);
+                }
             }
         }
+        
         return result;
+    }
+
+    public static async Task DisableRepoAclFlagByName(
+        string token,
+        IdentityDescriptor userId,
+        RepoAcl toRemove
+        )
+    {
+        var connection = GetConnection();
+        var client = connection.GetClient<SecurityHttpClient>();
+        var gitRepoNamespace = await GetSecurityNamespaceByName("Git Repositories");
+        await client.RemovePermissionAsync(
+            securityNamespaceId: gitRepoNamespace.NamespaceId,
+            token: token,
+            descriptor: userId,
+            permissions: (int)toRemove
+        );
     }
 }

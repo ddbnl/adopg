@@ -32,6 +32,7 @@ public static class OrganizationCache
     
     public static async Task Regenerate()
     {
+        Projects.Clear();
         var projects = await AzureDevops.GetProjects();
         foreach (var project in projects)
         {
@@ -74,7 +75,7 @@ public class ProjectCache
     
     private async Task AddRepo(GitRepository gitRepository)
     {
-        var repositoryCache = new RepositoryCache(Project, gitRepository);
+        var repositoryCache = new RepositoryCache(this, gitRepository);
         await repositoryCache.Regenerate();
         Repos.Add(repositoryCache);
     }
@@ -141,26 +142,35 @@ public class ProjectCache
     }
 }
 
-public class RepositoryCache(TeamProjectReference project, GitRepository repository)
+public class RepositoryCache(ProjectCache project, GitRepository repository)
 {
-    public readonly TeamProjectReference Project = project;
+    public readonly ProjectCache Project = project;
     public readonly GitRepository Repository = repository;
     public readonly List<RepositoryAclCache> Acls = [];
     public bool Valid = false;
 
-    private void AddAcl(Identity identity, RepoAcl acl)
+    private void AddAcl(Identity identity, RepoAcl acl, string token)
     {
-        var repositoryAcl = new RepositoryAclCache(Project, Repository, identity, acl);
+        var repositoryAcl = new RepositoryAclCache(Project, Repository, identity, acl, token);
         Acls.Add(repositoryAcl);
     }
 
     public async Task Regenerate()
     {
-        var acls = await AzureDevops.GetRepoAclByName(Repository.Name, Project.Name);
-        foreach (var acl in acls)
+        IEnumerable<string> tokens =
+        [
+            $"repoV2/{Repository.Id}",
+            $"repoV2/{project.Project.Id}",
+        ];
+        foreach (var token in tokens)
         {
-            AddAcl(acl.Key, acl.Value);
+            var acls = await AzureDevops.GetRepoAcl(token);
+            foreach (var acl in acls)
+            {
+                AddAcl(acl.Key, acl.Value, token);
+            }            
         }
+
         Valid = true;
     }
 }
@@ -205,15 +215,18 @@ public class PipelineCache(TeamProjectReference project, Pipeline pipeline)
 }
 
 public class RepositoryAclCache(
-    TeamProjectReference project,
+    ProjectCache project,
     GitRepository repository,
     Identity identity,
-    RepoAcl acl)
+    RepoAcl acl,
+    string token
+    )
 {
-    public readonly TeamProjectReference Project = project;
+    public readonly ProjectCache Project = project;
     public readonly GitRepository Repository = repository;
     public readonly Identity Identity = identity;
     public readonly RepoAcl Acl = acl;
+    public readonly string Token = token;
     public bool Valid = false;
 }
 

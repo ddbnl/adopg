@@ -2,23 +2,35 @@ using AzureDevOpsPolicyGuard.Enums;
 using AzureDevOpsPolicyGuard.Support;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.VisualStudio.Services.Common;
+using Microsoft.VisualStudio.Services.Identity;
 
 namespace AzureDevOpsPolicyGuard.Policies.Repos;
 
-public class RepoNoDeletePolicy(string project, int pipelineId, string repo): BasePolicy(project, pipelineId)
+
+public record RemediationRecord
+{
+    public IdentityDescriptor Identity { get; init; }
+    public string Token { get; init; }
+}
+
+
+public class RepoNoDeletePolicy(ProjectCache project, int pipelineId, string repo): BasePolicy(project, pipelineId)
 {
     public readonly string Repo = repo;
+    public List<RemediationRecord> RemediationDetails = [];
 
-    public override Task Remediate()
+    public override async Task Remediate(int compliancyError)
     {
-        throw new NotImplementedException();
+        var remediate = RemediationDetails[compliancyError];
+        await AzureDevops
+            .DisableRepoAclFlagByName(remediate.Token, remediate.Identity, RepoAcl.DeleteOrDisableRepository);
     }
 
     public string PipelineName()
     {
         return OrganizationCache
             .Projects
-            .First(c => c.Project.Name == project)
+            .First(c => c.Project.Name == Project.Project.Name)
             .Pipelines.First(c => c.Pipeline.Id == PipelineId)
             .Pipeline.Name;
     }
@@ -31,16 +43,25 @@ public class RepoNoDeletePolicy(string project, int pipelineId, string repo): Ba
     public override void CheckCompliance()
     {
         ComplianceFailures = [];
+        RemediationDetails = [];
 
-        OrganizationCache
-            .Projects
-            .First(project => project.Project.Name == Project)
+        Project
             .Repos
             .First(repo => repo.Repository.Name == Repo)
             .Acls
             .Where(acl => (acl.Acl & RepoAcl.DeleteOrDisableRepository) != 0)
             .ForEach(errorAcl =>
-                ComplianceFailures.Add($"{errorAcl.Identity.DisplayName} should not be able to delete the repository"));
+            {
+                var remediate = new RemediationRecord
+                {
+                    Identity = errorAcl.Identity.Descriptor,
+                    Token = errorAcl.Token,
+
+                };
+                RemediationDetails.Add(remediate);
+                ComplianceFailures.Add(
+                    $"{errorAcl.Identity.DisplayName} should not be able to delete the repository");
+            });
         
         IsChecked = true;
         LastChecked = DateTimeOffset.Now;

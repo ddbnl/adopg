@@ -25,7 +25,7 @@ public static class RepoNoDeleteRepository
                     OrganizationCache.GetGitRepositoryByPipelineId(project.Project.Name, pipeline.Pipeline.Id);
                 if (repository != null)
                 {
-                    var policy = new RepoNoDeletePolicy(project.Project.Name, pipeline.Pipeline.Id, repository.Repository.Name);
+                    var policy = new RepoNoDeletePolicy(project, pipeline.Pipeline.Id, repository.Repository.Name);
                     Policies.Add(policy);
                 }
             }
@@ -40,8 +40,8 @@ public static class RepoNoDeleteRepository
         }
     }
 
-    public static RepoNoDeletePolicy? GetPolicy(string projectName, int pipelineId)
+    public static RepoNoDeletePolicy? GetPolicy(ProjectCache project, int pipelineId)
     {
-        return Policies.Find(policy => policy.Project == projectName && policy.PipelineId == pipelineId);
+        return Policies.Find(policy => policy.Project.Project.Name == project.Project.Name && policy.PipelineId == pipelineId);
     }
 }

@@ -23,3 +23,20 @@ public enum RepoAcl
     AdvancedSecurityManageAndDismissAlerts = 131072,
     AdvancedSecurityManageSettings = 262144,
 }
+
+public static class RepoAclExtensions
+{
+    public static RepoAcl DisableFlag(this RepoAcl acl, RepoAcl flag)
+    {
+        if (acl.HasFlag(flag))
+        {
+            var newValue = (int)acl - (int)flag;
+            return (RepoAcl)newValue;
+        }
+        else
+        {
+            return acl;
+        }
+    }
+    
+}
