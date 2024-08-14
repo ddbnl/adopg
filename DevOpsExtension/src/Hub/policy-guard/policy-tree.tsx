@@ -3,7 +3,7 @@ import { getItemProvider, IPolicyTableItem, treeColumns } from "./TreeData";
 import { Card } from "azure-devops-ui/Card";
 import { Tree } from "azure-devops-ui/TreeEx";
 import { ITreeItemProvider, ITreeItemEx } from "azure-devops-ui/Utilities/TreeItemProvider";
-import {Pipeline} from "./policy-guard";
+import {Pipeline} from "./Types";
 
 interface PolicyProps {
     policies: Pipeline[];

@@ -1,1 +1,0 @@
-tfx extension publish --publisher deBoerICT --token ktyezymh57v2jbsm6h7am2fticqyostvwyizhq5f4jxbpag56yaq --rev-version

@@ -1,4 +1,4 @@
-namespace AzureDevOpsPolicyGuard.Enums;
+namespace AzureDevOpsPolicyGuard.Application.Common.Enums;
 
 [Flags]
 public enum RepoAcl

@@ -10,30 +10,33 @@ import { CommonServiceIds, IProjectPageService } from "azure-devops-extension-ap
 import {IHeaderCommandBarItem} from "azure-devops-ui/HeaderCommandBar";
 import PolicyTree from "./policy-tree";
 import {useEffect} from "react";
+import {Pipeline} from "./Types";
+import {GetPolicies, RefreshBackend} from "./BackendCalls";
+import {Simulate} from "react-dom/test-utils";
+import load = Simulate.load;
 
 
 const PolicyGuard = () => {
     
     const [policies, setPolicies] = React.useState<Pipeline[]>([]);
+    const [project, setProject] = React.useState<string>();
     useEffect(() => {
         const inner = async () => {
 
             try {
-                console.log("Initializing SDK...");
                 SDK.init().catch(console.error)
 
                 SDK.ready().then(async () => {
-                    console.log("SDK is ready...");
                     const client = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
                     const organization = SDK.getHost();
-                    const policies = await client.getProject().then(async context => {
-                        return connectBackend(organization.name).then(async () => {
-                            return RefreshBackend().then(async () => {
-                                return await GetPolicies(context.name);
+                        await client.getProject().then(async context => {
+                        setProject(context.name);
+                        await RefreshBackend(organization.name).then(async () => {
+                            await GetPolicies(organization.name, context.name).then(loadedPolicies => {
+                                setPolicies(loadedPolicies);
                             });
                         });
                     });
-                    setPolicies(policies);
                 }).catch((error) => {
                     console.error("SDK ready failed: ", error);
                 });
@@ -49,7 +52,7 @@ const PolicyGuard = () => {
 
     return (
         <Page className="sample-hub flex-grow">
-            <Header title="Policy guard" commandBarItems={getCommandBarItems()}/>
+            <Header title="Policy guard" commandBarItems={getCommandBarItems(project, setPolicies)}/>
             <div className="page-content">
                 <PolicyTree policies={policies}/>
             </div>
@@ -57,7 +60,7 @@ const PolicyGuard = () => {
     );
 }
 
-function getCommandBarItems(): IHeaderCommandBarItem[] {
+function getCommandBarItems(project: string, setPolicies: any): IHeaderCommandBarItem[] {
     return [
         {
             id: "refresh",
@@ -68,7 +71,7 @@ function getCommandBarItems(): IHeaderCommandBarItem[] {
             },
             onActivate: () => {
                 const refreshFunc = async () => {
-                    await onRefreshClicked();
+                    await onRefreshClicked(project, setPolicies);
                 }
                 refreshFunc()
                     .catch(console.error);
@@ -77,85 +80,15 @@ function getCommandBarItems(): IHeaderCommandBarItem[] {
     ];
 }
 
-async function onRefreshClicked(): Promise<void> {
+async function onRefreshClicked(project: string, setPolicies: any): Promise<void> {
 
     const organization = SDK.getHost();
-    await connectBackend(organization.name);
-    await RefreshBackend();
+    await RefreshBackend(organization.name).then(async () => {
+        await GetPolicies(organization.name, project).then(async policies => {
+            setPolicies(policies);
+        });
+    })
 }
 
-async function connectBackend(organization: string): Promise<void> {
-    const requestOptions = {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-    }
-    await fetch(`http://localhost:5214/connect?organization=${organization}`, requestOptions)
-}
-
-async function RefreshBackend(): Promise<void> {
-    const requestOptions = {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-    }
-    await fetch('http://localhost:5214/refresh', requestOptions)
-}
-
-export async function remediatePolicy(project: string,  policyId: string, reconcileError: number, userDescriptor: string): Promise<void> {
-    const body = {
-        descriptor: userDescriptor,
-        reconcile_error: reconcileError,
-    }
-    const requestOptions = {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body),
-    }
-    await fetch(`http://localhost:5214/projects/${project}/policies/${policyId}/remediate`, requestOptions)
-}
-async function GetPolicies(project: string) : Promise<Pipeline[]> {
-    const requestOptions = {
-        method: 'GET',
-        headers: {'Content-Type': 'application/json'},
-    }
-    const url =`http://localhost:5214/projects/${project}/policies`;
-    const response = await fetch(url, requestOptions);
-    const json: object = await response.json();
-    
-    let pipelines: Pipeline[] = [];
-
-    
-    for (const [pipelineName, pipelineData] of Object.entries(json)) {
-        
-        let policies: Policy[] = [];
-        for (const policyJson of pipelineData) {
-            policies.push({
-                Id: policyJson['id'],
-                Description: policyJson['description'],
-                Compliant: policyJson['compliant'],
-                LastChecked: policyJson['lastChecked'],
-                Errors: policyJson['errors'],
-            });
-        }
-        const pipeline: Pipeline = {
-            Name: pipelineName,
-            Policies: policies,
-        }
-        pipelines.push(pipeline);
-    }
-    return pipelines;
-}
 
 export default PolicyGuard
-
-export interface Pipeline {
-    Name: string;
-    Policies: Policy[];
-}
-
-export interface Policy {
-    Id: string;
-    Description: string;
-    Compliant: boolean;
-    LastChecked: string;
-    Errors: [string];
-}

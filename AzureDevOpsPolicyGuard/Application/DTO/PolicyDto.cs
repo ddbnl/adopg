@@ -7,5 +7,5 @@ public class PolicyDto
     public string Description { get; set; }
     public bool Compliant { get; set; }
     public DateTimeOffset LastChecked { get; set; }
-    public IEnumerable<string> Errors { get; set; }
+    public IEnumerable<ViolationDto> Errors { get; set; }
 }

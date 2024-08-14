@@ -3,10 +3,15 @@ import {ColumnMore, ISimpleTableCell} from "azure-devops-ui/Table";
 import {renderExpandableTreeCell, renderTreeCell} from "azure-devops-ui/TreeEx";
 import {ITreeItem, ITreeItemProvider, TreeItemProvider,} from "azure-devops-ui/Utilities/TreeItemProvider";
 import {IconSize} from "azure-devops-ui/Icon";
-import {Pipeline, remediatePolicy} from "./policy-guard";
-import {IMenuItem} from "azure-devops-ui/Menu";
 import * as SDK from "azure-devops-extension-sdk";
 import {CommonServiceIds, IProjectPageService} from "azure-devops-extension-api";
+import {
+    remediateAllPolicies,
+    remediateAllViolations,
+    remediateViolation
+} from "./BackendCalls";
+import {Pipeline} from "./Types";
+import {getHost} from "azure-devops-extension-sdk";
 
 export interface IPolicyTableItem extends ISimpleTableCell {
     policy: string;
@@ -40,7 +45,7 @@ export const moreColumn = new ColumnMore(target => {
                 id: "reconcile",
                 text: "Reconcile",
                 
-                onActivate: (menuItem: any, event: any) => {
+                onActivate: (_menuItem: any, _event: any) => {
                     OnReconcile(target)
                         .catch(console.error)
                 },
@@ -53,13 +58,21 @@ export const moreColumn = new ColumnMore(target => {
 export const treeColumns = [pipelineColumn, statusColumn, policyColumn, moreColumn];
 
 async function OnReconcile(menuItem: any): Promise<void> {
-    const policyId = menuItem.underlyingItem.data.reconcile;
-    const reconcileError = menuItem.underlyingItem.data.reconcile_error;
+    
+    const organization = getHost().name;
+    const policyId = menuItem.underlyingItem.data.policy_id;
+    const violationId = menuItem.underlyingItem.data.violation_id;
+    const pipeline = menuItem.underlyingItem.data.pipeline;
     const client = await SDK.getService<IProjectPageService>(CommonServiceIds.ProjectPageService);
     const project = await client.getProject();
     const user = SDK.getUser();
-    console.log("onReconcile", user);
-    await remediatePolicy(project.name, policyId, reconcileError, user.id)
+    if (policyId == "all" && violationId == "all") {
+        await remediateAllPolicies(organization, project.name, pipeline,  user.id)
+    } else if (violationId == "all") {
+        await remediateAllViolations(organization, project.name, policyId, user.id)
+    } else {
+        await remediateViolation(organization, project.name, policyId, violationId, user.id)
+    }
 }
 
 export function getItemProvider(pipelines: Pipeline[]): ITreeItemProvider<IPolicyTableItem> {
@@ -69,18 +82,20 @@ export function getItemProvider(pipelines: Pipeline[]): ITreeItemProvider<IPolic
     for (const pipeline of pipelines) {
         let pipelineCompliant = true;
         for (const policy of pipeline.Policies) {
+            let policyCompliant = true;
             let errorChildren: any = [];
             let i = 0;
             policy.Errors.forEach(error => {
+                policyCompliant = false;
                 pipelineCompliant = false;
                 errorChildren.push(
                     {
                         data: {
                             pipeline: "",
-                            policy: error,
+                            policy: error.Description,
                             status: GetErrorStatus(),
-                            reconcile: policy.Id,
-                            reconcile_error: i,
+                            policy_id: policy.Id,
+                            violation_id: error.Id,
                         }
                     }
                 )
@@ -92,7 +107,9 @@ export function getItemProvider(pipelines: Pipeline[]): ITreeItemProvider<IPolic
                 data: {
                     pipeline: "",
                     policy: policy.Description,
-                    status: policy.Compliant ? GetOkStatus() : GetErrorStatus(),
+                    status: policyCompliant ? GetOkStatus() : GetErrorStatus(),
+                    policy_id: policy.Id,
+                    violation_id: "all",
                 },
                 childItems: errorChildren,
             });
@@ -101,6 +118,8 @@ export function getItemProvider(pipelines: Pipeline[]): ITreeItemProvider<IPolic
                     pipeline: pipeline.Name,
                     policy: "",
                     status: pipelineCompliant ? GetOkStatus() : GetErrorStatus(),
+                    policy_id: "all",
+                    violation_id: "all",
                 },
                 childItems: policyChildren,
             }); 

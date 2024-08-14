@@ -1,20 +1,24 @@
-using AzureDevOpsPolicyGuard.Enums;
+using AzureDevOpsPolicyGuard.Application.Common.Enums;
+using AzureDevOpsPolicyGuard.Application.Services;
 using Microsoft.Azure.Pipelines.WebApi;
 using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
-using Microsoft.VisualStudio.Services.Common;
-using Microsoft.VisualStudio.Services.Graph;
 using Microsoft.VisualStudio.Services.Graph.Client;
 using Microsoft.VisualStudio.Services.Identity;
 
 namespace AzureDevOpsPolicyGuard.Support;
 
-public static class OrganizationCache
+public class OrganizationCacheService : IOrganizationCacheService
 {
-    public static readonly List<ProjectCache> Projects = [];
-    public static bool Valid = false;
+    public readonly List<ProjectCache> Projects = [];
+    public bool Valid = false;
 
-    public static RepositoryCache? GetGitRepositoryByPipelineId(string project, int pipelineId)
+    public List<ProjectCache> GetProjects()
+    {
+        return Projects;
+    }
+
+    public RepositoryCache? GetGitRepositoryByPipelineId(string project, int pipelineId)
     {
         var projectCache = Projects.First(c => c.Project.Name == project);
         var pipelineCache = projectCache.Pipelines.First(c => c.Pipeline.Id == pipelineId);
@@ -23,27 +27,26 @@ public static class OrganizationCache
         var repository = projectCache.Repos.First(c => c.Repository.Id == repoId);
         return repository;
     }
-    public static async Task AddProject(TeamProjectReference project)
+    public async Task AddProject(IAzureDevopsService azureDevopsService, TeamProjectReference project)
     {
         var projectCache = new ProjectCache(project);
-        await projectCache.Regenerate();
+        await projectCache.Regenerate(azureDevopsService);
         Projects.Add(projectCache);
     }
     
-    public static async Task Regenerate()
+    public async Task Regenerate(IAzureDevopsService azureDevopsService)
     {
         Projects.Clear();
-        var projects = await AzureDevops.GetProjects();
+        var projects = await azureDevopsService.GetProjects();
         foreach (var project in projects)
         {
-            AzureDevops.GetPipelines(project.Name);
-            await AddProject(project);
+            await AddProject(azureDevopsService, project);
         }
         Valid = true;
     }
 }
 
-public class ProjectCache
+public class ProjectCache : IProjectCache
 {
     public readonly TeamProjectReference Project;
     public string ScopeDescriptor;
@@ -73,10 +76,10 @@ public class ProjectCache
         return isMemberOf;
     }
     
-    private async Task AddRepo(GitRepository gitRepository)
+    private async Task AddRepo(IAzureDevopsService azureDevopsService, GitRepository gitRepository)
     {
         var repositoryCache = new RepositoryCache(this, gitRepository);
-        await repositoryCache.Regenerate();
+        await repositoryCache.Regenerate(azureDevopsService);
         Repos.Add(repositoryCache);
     }
     
@@ -87,62 +90,62 @@ public class ProjectCache
         Pipelines.Add(pipelineCache);
     }
     
-    private async Task AddMember(GraphMember member)
+    private async Task AddMember(IAzureDevopsService azureDevopsService, GraphMember member)
     {
-        var identity = await AzureDevops.FindIdentity(member.DisplayName);
-        var memberships = await AzureDevops.GetMemberships(member.Descriptor, 
+        var identity = await azureDevopsService.FindIdentity(member.DisplayName);
+        var memberships = await azureDevopsService.GetMemberships(member.Descriptor, 
             Groups.Select(c => c.Group).ToList());
         var memberCache = new MemberCache(Project, identity, member, memberships.ToList());
         Members.Add(memberCache);
     }
-    private async Task AddGroup(GraphGroup group)
+    private async Task AddGroup(IAzureDevopsService azureDevopsService, GraphGroup group)
     {
-        var identity = await AzureDevops.FindIdentity(group.DisplayName);
+        var identity = await azureDevopsService.FindIdentity(group.DisplayName);
         var groupCache = new GroupCache(Project, identity, group);
         Groups.Add(groupCache);
     }
-    private async Task AddServicePrincipal(GraphServicePrincipal servicePrincipal)
+    private async Task AddServicePrincipal(IAzureDevopsService azureDevopsService, GraphServicePrincipal servicePrincipal)
     {
-        var identity = await AzureDevops.FindIdentity(servicePrincipal.DisplayName);
+        var identity = await azureDevopsService.FindIdentity(servicePrincipal.DisplayName);
         var servicePrincipalCache = new ServicePrincipalCache(Project, identity, servicePrincipal);
         ServicePrincipals.Add(servicePrincipalCache);
     } 
 
-    public async Task Regenerate()
+    public async Task Regenerate(IAzureDevopsService azureDevopsService)
     {
-        ScopeDescriptor = await AzureDevops.GetScope(Project.Id);
-        var repos = await AzureDevops.GetRepos(Project.Name);
-        var pipelines = await AzureDevops.GetPipelines(Project.Name);
-        var groups = await AzureDevops.GetGroups(null);
-        var members = await AzureDevops.GetMembers(ScopeDescriptor);
-        var servicePrincipals = await AzureDevops.GetServicePrincipals(ScopeDescriptor);
+        ScopeDescriptor = await azureDevopsService.GetScope(Project.Id);
+        var repos = await azureDevopsService.GetRepos(Project.Name);
+        var pipelines = await azureDevopsService.GetPipelines(Project.Name);
+        var groups = await azureDevopsService.GetGroups(null);
+        var members = await azureDevopsService.GetMembers(ScopeDescriptor);
+        var servicePrincipals = await azureDevopsService.GetServicePrincipals(ScopeDescriptor);
         
         foreach (var repo in repos)
         {
-            await AddRepo(repo);
+            await AddRepo(azureDevopsService, repo);
         }       
         foreach (var pipeline in pipelines)
         {
-            var pipelineDetails = await AzureDevops.GetPipeline(Project.Name, pipeline.Id);
+            var pipelineDetails = await azureDevopsService.GetPipeline(Project.Name, pipeline.Id);
             await AddPipeline(pipelineDetails);
         }       
         foreach (var group in groups)
         {
-            await AddGroup(group);
+            await AddGroup(azureDevopsService, group);
         }
         foreach (var member in members)
         {
-            await AddMember(member);
+            await AddMember(azureDevopsService, member);
         }
         foreach (var servicePrincipal in servicePrincipals)
         {
-            await AddServicePrincipal(servicePrincipal);
+            await AddServicePrincipal(azureDevopsService, servicePrincipal);
         }
         Valid = true;
     }
 }
 
-public class RepositoryCache(ProjectCache project, GitRepository repository)
+public class RepositoryCache(ProjectCache project, GitRepository repository) : IRepositoryCache
 {
     public readonly ProjectCache Project = project;
     public readonly GitRepository Repository = repository;
@@ -155,7 +158,7 @@ public class RepositoryCache(ProjectCache project, GitRepository repository)
         Acls.Add(repositoryAcl);
     }
 
-    public async Task Regenerate()
+    public async Task Regenerate(IAzureDevopsService azureDevopsService)
     {
         IEnumerable<string> tokens =
         [
@@ -164,7 +167,7 @@ public class RepositoryCache(ProjectCache project, GitRepository repository)
         ];
         foreach (var token in tokens)
         {
-            var acls = await AzureDevops.GetRepoAcl(token);
+            var acls = await azureDevopsService.GetRepoAcl(token);
             foreach (var acl in acls)
             {
                 AddAcl(acl.Key, acl.Value, token);
@@ -175,7 +178,7 @@ public class RepositoryCache(ProjectCache project, GitRepository repository)
     }
 }
 
-public class PipelineCache(TeamProjectReference project, Pipeline pipeline)
+public class PipelineCache(TeamProjectReference project, Pipeline pipeline) : IPipelineCache
 {
     public readonly TeamProjectReference Project = project;
     public readonly Pipeline Pipeline = pipeline;
@@ -220,7 +223,7 @@ public class RepositoryAclCache(
     Identity identity,
     RepoAcl acl,
     string token
-    )
+    ) : IRepositoryAclCache
 {
     public readonly ProjectCache Project = project;
     public readonly GitRepository Repository = repository;
@@ -235,7 +238,7 @@ public class MemberCache(
     Identity identity,
     GraphMember member,
     List<GraphGroup> memberships
-    )
+    ) : IMemberCache
 {
     public readonly TeamProjectReference Project = project;
     public readonly Identity Identity = identity;
@@ -246,7 +249,7 @@ public class MemberCache(
 public class GroupCache(
     TeamProjectReference project,
     Identity identity,
-    GraphGroup group)
+    GraphGroup group) : IGroupCache
 {
     public readonly TeamProjectReference Project = project;
     public readonly Identity Identity = identity;
@@ -255,7 +258,7 @@ public class GroupCache(
 public class ServicePrincipalCache(
     TeamProjectReference project,
     Identity identity,
-    GraphServicePrincipal servicePrincipal)
+    GraphServicePrincipal servicePrincipal) : IServicePrincipalCache
 {
     public readonly TeamProjectReference Project = project;
     public readonly Identity Identity = identity;

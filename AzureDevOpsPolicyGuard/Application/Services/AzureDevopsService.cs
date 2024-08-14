@@ -1,32 +1,30 @@
 using Azure.Identity;
-using AzureDevOpsPolicyGuard.Enums;
+using AzureDevOpsPolicyGuard.Application.Common.Enums;
 using Microsoft.Azure.Pipelines.WebApi;
 using Microsoft.TeamFoundation.Common;
 using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.VisualStudio.Services.Client;
-using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.Graph.Client;
 using Microsoft.VisualStudio.Services.Identity;
 using Microsoft.VisualStudio.Services.Identity.Client;
 using Microsoft.VisualStudio.Services.Security;
 using Microsoft.VisualStudio.Services.Security.Client;
-using Microsoft.VisualStudio.Services.Users.Client;
 using Microsoft.VisualStudio.Services.WebApi;
 
-namespace AzureDevOpsPolicyGuard.Support;
+namespace AzureDevOpsPolicyGuard.Application.Services;
 
-public static class AzureDevops
+public class AzureDevopsService : IAzureDevopsService
 {
-    private static VssConnection? _connection;
-    private static Uri? _baseUri;
+    private VssConnection? _connection;
+    private Uri? _baseUri;
 
-    public static void SetOrganization(string organization)
+    public void SetOrganization(string organization)
     {
         _baseUri = new Uri($"https://dev.azure.com/{organization}");
     }
 
-    private static VssConnection GetConnection()
+    private VssConnection GetConnection()
     {
         if (_connection == null)
         {
@@ -35,7 +33,7 @@ public static class AzureDevops
         return _connection!;
     }
 
-    private static void Connect()
+    private void Connect()
     {
         if (_baseUri == null)
         {
@@ -47,7 +45,7 @@ public static class AzureDevops
         _connection = new VssConnection(_baseUri, adoCredential, settings);
     }
 
-    public static async Task<IEnumerable<TeamProjectReference>> GetProjects()
+    public async Task<IEnumerable<TeamProjectReference>> GetProjects()
     {
         var connection = GetConnection();
         var client = connection.GetClient<ProjectHttpClient>();
@@ -63,7 +61,7 @@ public static class AzureDevops
         return aggregate;
     }
 
-    public static async Task<string> GetScope(Guid id)
+    public async Task<string> GetScope(Guid id)
     {
         var connection = GetConnection();
         var client = connection.GetClient<GraphHttpClient>();
@@ -71,7 +69,7 @@ public static class AzureDevops
         return descriptor.Value;
     }
     
-    public static async Task<IEnumerable<GraphMember>> GetMembers(string? scope)
+    public async Task<IEnumerable<GraphMember>> GetMembers(string? scope)
     {
         var connection = GetConnection();
         var client = connection.GetClient<GraphHttpClient>();
@@ -86,7 +84,7 @@ public static class AzureDevops
         return aggregate;
     }
 
-    public static async Task<IEnumerable<GraphGroup>> GetMemberships(string user, List<GraphGroup> allGroups)
+    public async Task<IEnumerable<GraphGroup>> GetMemberships(string user, List<GraphGroup> allGroups)
     {
         var connection = GetConnection();
         var client = connection.GetClient<GraphHttpClient>();
@@ -95,7 +93,7 @@ public static class AzureDevops
         return allGroups.Where(c => ids.Contains(c.Descriptor.Identifier));
     }
     
-    public static async Task<IEnumerable<GraphGroup>> GetGroups(string? scope)
+    public async Task<IEnumerable<GraphGroup>> GetGroups(string? scope)
     { 
         var connection = GetConnection();
         var client = connection.GetClient<GraphHttpClient>();
@@ -111,7 +109,7 @@ public static class AzureDevops
         return aggregate;
     }     
     
-    public static async Task<IEnumerable<GraphServicePrincipal>> GetServicePrincipals(string scope)
+    public async Task<IEnumerable<GraphServicePrincipal>> GetServicePrincipals(string scope)
     {
         var connection = GetConnection();
         var client = connection.GetClient<GraphHttpClient>();
@@ -126,7 +124,7 @@ public static class AzureDevops
 
         return aggregate;
     }    
-    public static async Task<List<Pipeline>> GetPipelines(string project)
+    public async Task<List<Pipeline>> GetPipelines(string project)
     {
         var connection = GetConnection();
         var client = connection.GetClient<PipelinesHttpClient>();
@@ -134,7 +132,7 @@ public static class AzureDevops
         return pipelines; 
     }
 
-    public static async Task<Pipeline> GetPipeline(string project, int pipelineId)
+    public async Task<Pipeline> GetPipeline(string project, int pipelineId)
     {
         var connection = GetConnection();
         var client = connection.GetClient<PipelinesHttpClient>();
@@ -142,21 +140,21 @@ public static class AzureDevops
         return pipeline; 
     }   
     
-    public static async Task<IEnumerable<SecurityNamespaceDescription>> GetSecurityNamespaces()
+    public async Task<IEnumerable<SecurityNamespaceDescription>> GetSecurityNamespaces()
     {
         var connection = GetConnection();
         var client = connection.GetClient<SecurityHttpClient>();
         return await client.QuerySecurityNamespacesAsync(Guid.Empty);
     }
 
-    public static async Task<SecurityNamespaceDescription> GetSecurityNamespaceByName(string name)
+    public async Task<SecurityNamespaceDescription> GetSecurityNamespaceByName(string name)
     {
         var namespaces = await GetSecurityNamespaces();
         return namespaces
             .First(c => c.Name == name);
     }
     
-    public static async Task<IEnumerable<GitRepository>> GetRepos(string project)
+    public async Task<IEnumerable<GitRepository>> GetRepos(string project)
     {
         var connection = GetConnection();
         var gitClient = connection.GetClient<GitHttpClient>();
@@ -164,14 +162,14 @@ public static class AzureDevops
         return repos;
     }    
 
-    public static async Task<GitRepository> GetRepoByName(string name, string project)
+    public async Task<GitRepository> GetRepoByName(string name, string project)
     {
         var repos = await GetRepos(project);
         return repos
             .First(c => c.Name == name);
     }
 
-    public static async Task<Identity> FindIdentityById(string id)
+    public async Task<Identity> FindIdentityById(string id)
     {
         var connection = GetConnection();
         var client = connection.GetClient<IdentityHttpClient>();
@@ -179,7 +177,7 @@ public static class AzureDevops
         return resolvedIdentity.First();
     }
 
-    public static async Task<Identity> FindIdentity(string displayName)
+    public async Task<Identity> FindIdentity(string displayName)
     {
         var connection = GetConnection();
         var client = connection.GetClient<IdentityHttpClient>();
@@ -188,10 +186,8 @@ public static class AzureDevops
         return identity;
     }
     
-    public static async Task<Dictionary<Identity, RepoAcl>> GetRepoAcl(string token)
+    public async Task<Dictionary<Identity, RepoAcl>> GetRepoAcl(string token)
     {
-
-
         var result = new Dictionary<Identity, RepoAcl>();
     
         var connection = GetConnection();
@@ -221,7 +217,7 @@ public static class AzureDevops
         return result;
     }
 
-    public static async Task DisableRepoAclFlagByName(
+    public async Task DisableRepoAclFlagByName(
         string token,
         IdentityDescriptor userId,
         RepoAcl toRemove
